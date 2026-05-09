@@ -1,0 +1,125 @@
+# Claude Code PR Review Automation
+# Place this file at: .github/workflows/claude-code-review.yml
+#
+# This workflow runs automated checks based on your .claude/ configuration
+# when a PR is opened or updated.
+
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '**/*'
+      - '!.claude/**'
+
+jobs:
+  taste-invariants:
+    name: Check Taste Invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed
+        run: |
+          echo "files=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Check for hardcoded strings (example)
+        if: hashFiles('.claude/TASTE_INVARIANTS.md') != ''
+        run: |
+          # This is an example — customize for your project's invariants
+          echo "Running invariant checks..."
+
+          # Example: Check Swift files for hardcoded strings
+          # if echo "${{ steps.changed.outputs.files }}" | grep -q '\.swift$'; then
+          #   # Run your invariant checks here
+          #   echo "Would check Swift files"
+          # fi
+
+          echo "✅ Invariant checks complete (customize in workflow file)"
+
+  validate-config:
+    name: Validate Claude Config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check .claude/ structure
+        if: hashFiles('.claude/CLAUDE.md') != ''
+        run: |
+          echo "📁 Checking .claude/ configuration..."
+
+          # Check required files exist
+          for file in CLAUDE.md TASTE_INVARIANTS.md settings.json; do
+            if [ ! -f ".claude/$file" ]; then
+              echo "❌ Missing: .claude/$file"
+              exit 1
+            fi
+            echo "  ✅ $file"
+          done
+
+          # Validate JSON files
+          if command -v jq &> /dev/null; then
+            for json in settings.json hooks/skill-rules.json; do
+              if [ -f ".claude/$json" ]; then
+                if jq empty ".claude/$json" 2>/dev/null; then
+                  echo "  ✅ $json is valid JSON"
+                else
+                  echo "❌ $json is invalid JSON"
+                  exit 1
+                fi
+              fi
+            done
+          fi
+
+          # Check version file
+          if [ -f ".claude/.claude-version" ]; then
+            echo "  ✅ Version: $(cat .claude/.claude-version)"
+          else
+            echo "⚠️  No .claude-version file found"
+          fi
+
+          echo "✅ Configuration validation complete"
+
+  comment-summary:
+    name: Post Review Summary
+    needs: [taste-invariants, validate-config]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Post summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const checks = {
+              invariants: '${{ needs.taste-invariants.result }}',
+              config: '${{ needs.validate-config.result }}'
+            };
+
+            const status = (result) => {
+              if (result === 'success') return '✅';
+              if (result === 'failure') return '❌';
+              return '⏭️';
+            };
+
+            const body = `## 🤖 Claude Code Review Summary
+
+| Check | Status |
+|-------|--------|
+| Taste Invariants | ${status(checks.invariants)} |
+| Config Validation | ${status(checks.config)} |
+
+> This is an automated check based on your \\\".claude/\\\" configuration.
+> Customize checks in \\\".github/workflows/claude-code-review.yml\\\".`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l:*)",
+      "Bash(xargs:*)",
+      "Bash(du -sh:*)",
+      "WebFetch(domain:mcp.craft.do)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": []
+}

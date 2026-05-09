@@ -1,0 +1,109 @@
+# {{PROJECT_NAME}}
+
+{{PROJECT_DESCRIPTION}}
+
+## ⚠️ CRITICAL RULES - NEVER VIOLATE
+1. **NEVER commit/stage without explicit user request**
+2. **NEVER add AI signatures in code**
+3. **NEVER run destructive git operations** without explicit approval
+4. **Always present action plan** before implementing multi-step changes
+5. **NEVER trim whitespace-only lines**
+6. **NEVER edit generated files**{{#HAS_CODEGEN}} (marked with `// Generated using...`){{/HAS_CODEGEN}}
+7. **NEVER use hardcoded strings in UI**{{#HAS_LOCALIZATION}} — always use localization constants{{/HAS_LOCALIZATION}}
+8. **NEVER add comments** unless explicitly requested
+9. **ALWAYS update tests and mocks when refactoring**
+{{#HAS_FEATURE_FLAGS}}10. **Use feature flags for all new features**{{/HAS_FEATURE_FLAGS}}
+
+## 🚀 Quick Start
+```bash
+{{QUICK_START_COMMANDS}}
+```
+**Requirements**: {{REQUIREMENTS}}
+
+## 📚 Knowledge Map
+
+This file is a **table of contents**, not an encyclopedia. Deeper docs live in-repo.
+
+### Architecture & Patterns
+| Topic | Location |
+|-------|----------|
+{{#ARCHITECTURE_DOCS}}
+| {{topic}} | `{{path}}` |
+{{/ARCHITECTURE_DOCS}}
+
+### Design System
+| Topic | Location |
+|-------|----------|
+{{#DESIGN_SYSTEM_DOCS}}
+| {{topic}} | `{{path}}` |
+{{/DESIGN_SYSTEM_DOCS}}
+
+{{#HAS_CODEGEN}}
+### Code Generation
+| Topic | Location |
+|-------|----------|
+| {{codegen_topic}} | `{{codegen_path}}` |
+{{/HAS_CODEGEN}}
+
+### Code Review & Quality
+| Topic | Location |
+|-------|----------|
+| Review guidelines | `.claude/CODE_REVIEW_GUIDE.md` |
+| Self-review checklist | `.claude/skills/self-review/SKILL.md` |
+
+### Skills (Auto-Activate)
+
+| Skill | Triggers On |
+|-------|-------------|
+{{#SKILLS_TABLE}}
+| `{{slug}}` | {{triggers}} |
+{{/SKILLS_TABLE}}
+
+## 🔒 Pre-Implementation Gate
+When `confidence-check` activates, run 5-check assessment before writing code:
+```
+[ ] No duplicates found (25%)    [ ] Follows architecture patterns (25%)
+[ ] Verified existing code (20%)  [ ] Uses design system (15%)
+[ ] Root cause understood (15%)   → PROCEED ≥90% | PAUSE 70-89% | STOP <70%
+```
+
+## 🏗️ Project Structure
+```
+{{PROJECT_STRUCTURE}}
+```
+
+## 🔄 Git Workflow
+
+### Task-Based Branching
+**First thing when starting any task**:
+{{#HAS_ISSUE_TRACKER}}
+1. Fetch issue: {{ISSUE_FETCH_COMMAND}}
+2. Extract branch name
+3. Switch immediately: `git checkout <branch-name>`
+{{/HAS_ISSUE_TRACKER}}
+{{^HAS_ISSUE_TRACKER}}
+1. Create feature branch: `git checkout -b feature/description`
+2. Work on the branch
+3. Create PR when ready
+{{/HAS_ISSUE_TRACKER}}
+
+### Branches & PRs
+- **Main branch**: `{{MAIN_BRANCH}}`
+- **Feature branches**: `{{FEATURE_BRANCH_PATTERN}}`
+- **Commit messages**: Single line, direct, technical tone
+- **PR format**: `## Summary` + 1-3 bullet points
+
+## 📋 Tips
+{{#PROJECT_TIPS}}
+- {{tip}}
+{{/PROJECT_TIPS}}
+
+## ⚠️ Common Mistakes
+{{#COMMON_MISTAKES}}
+- **{{title}}**: {{description}}
+{{/COMMON_MISTAKES}}
+
+## 💡 Quick Reference
+{{#QUICK_REFS}}
+- {{description}}
+{{/QUICK_REFS}}

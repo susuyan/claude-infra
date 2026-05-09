@@ -1,0 +1,427 @@
+#!/usr/bin/env node
+/**
+ * claude-infra — Production-grade scaffolding for Claude Code
+ * =============================================================================
+ * One command to initialize, audit, upgrade, and manage your .claude/ setup.
+ *
+ * Usage:
+ *   claude-infra init [dir]        Initialize .claude/ in a project
+ *   claude-infra audit [dir]       Run configuration health check
+ *   claude-infra upgrade [dir]     Upgrade to latest version
+ *   claude-infra status [dir]      Show installation status
+ *   claude-infra doctor [dir]      Diagnose + auto-fix issues
+ *   claude-infra remove [dir]      Remove .claude/ configuration
+ *   claude-infra --version         Show version
+ *
+ * Install globally:
+ *   npm install -g claude-infra
+ *
+ * Or use via npx (no install):
+ *   npx claude-infra init
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const VERSION = require('../package.json').version;
+const TEMPLATE_DIR = path.join(__dirname, '..', 'templates', '.claude');
+
+// ─── Colors (no dependencies) ─────────────────────────────────────────────
+const C = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m',
+};
+
+function log(msg) { console.log(msg); }
+function info(msg) { console.log(`${C.blue}ℹ️  ${msg}${C.reset}`); }
+function ok(msg) { console.log(`${C.green}✅ ${msg}${C.reset}`); }
+function warn(msg) { console.log(`${C.yellow}⚠️  ${msg}${C.reset}`); }
+function err(msg) { console.log(`${C.red}❌ ${msg}${C.reset}`); }
+function bold(msg) { console.log(`${C.bold}${msg}${C.reset}`); }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+function findProjectRoot(cwd) {
+  let dir = path.resolve(cwd);
+  while (dir !== path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, '.claude'))) return dir;
+    dir = path.dirname(dir);
+  }
+  return null;
+}
+
+function getCurrentVersion(projectRoot) {
+  const vf = path.join(projectRoot, '.claude', '.claude-version');
+  if (fs.existsSync(vf)) {
+    return fs.readFileSync(vf, 'utf8').trim();
+  }
+  return '0.0.0';
+}
+
+function detectProjectType(dir) {
+  const files = fs.readdirSync(dir);
+  const has = (f) => files.includes(f) || fs.existsSync(path.join(dir, f));
+
+  if (has('Package.swift') || files.some(f => f.endsWith('.xcodeproj'))) return 'ios';
+  if (has('package.json')) {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    if (pkg.dependencies?.react || pkg.devDependencies?.react) return 'react';
+    return 'node';
+  }
+  if (has('Cargo.toml')) return 'rust';
+  if (has('go.mod')) return 'go';
+  if (has('pyproject.toml') || has('requirements.txt') || has('setup.py')) return 'python';
+  if (has('pom.xml') || has('build.gradle') || has('build.gradle.kts')) return 'java';
+  if (has('Gemfile')) return 'ruby';
+  return 'generic';
+}
+
+function getProjectName(dir) {
+  try {
+    if (fs.existsSync(path.join(dir, 'package.json'))) {
+      return JSON.parse(fs.readFileSync(path.join(dir, 'package.json'))).name || path.basename(dir);
+    }
+    if (fs.existsSync(path.join(dir, 'Cargo.toml'))) {
+      const m = fs.readFileSync(path.join(dir, 'Cargo.toml'), 'utf8').match(/^name\s*=\s*"(.+)"/m);
+      if (m) return m[1];
+    }
+  } catch { /* ignore */ }
+  return path.basename(dir);
+}
+
+function getMainBranch(dir) {
+  try {
+    return execSync('git branch --show-current', { cwd: dir, encoding: 'utf8' }).trim();
+  } catch {
+    return 'main';
+  }
+}
+
+const PROJECT_CONFIG = {
+  ios:    { formatter: 'swiftformat',   ext: 'swift', build: 'xcodebuild' },
+  react:  { formatter: 'prettier',      ext: 'tsx',   build: 'npm' },
+  node:   { formatter: 'prettier',      ext: 'js',    build: 'npm' },
+  rust:   { formatter: 'rustfmt',       ext: 'rs',    build: 'cargo' },
+  go:     { formatter: 'gofmt',         ext: 'go',    build: 'go' },
+  python: { formatter: 'black',         ext: 'py',    build: 'pytest' },
+  java:   { formatter: 'google-java-format', ext: 'java', build: 'gradle' },
+  ruby:   { formatter: 'rubocop',       ext: 'rb',    build: 'bundle' },
+  generic:{ formatter: '',              ext: '*',     build: '' },
+};
+
+// ─── Template Engine ──────────────────────────────────────────────────────
+function renderTemplate(src, vars) {
+  let content = fs.readFileSync(src, 'utf8');
+  for (const [key, val] of Object.entries(vars)) {
+    content = content.split(`{{${key}}}`).join(val || '');
+  }
+  // Remove remaining mustache blocks
+  content = content.replace(/\{\{#\w+\}\}[\s\S]*?\{\{\/\w+\}\}/g, '');
+  content = content.replace(/\{\{[^}]+\}\}/g, '');
+  return content;
+}
+
+function copyTemplate(srcDir, dstDir, vars) {
+  fs.mkdirSync(dstDir, { recursive: true });
+  for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const src = path.join(srcDir, entry.name);
+    const dst = path.join(dstDir, entry.name);
+    if (entry.isDirectory()) {
+      copyTemplate(src, dst, vars);
+    } else {
+      if (entry.name.endsWith('.template')) {
+        const finalDst = dst.replace(/\.template$/, '');
+        fs.writeFileSync(finalDst, renderTemplate(src, vars));
+      } else {
+        fs.copyFileSync(src, dst);
+      }
+    }
+  }
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────
+
+async function cmdInit(targetDir) {
+  const dir = path.resolve(targetDir || process.cwd());
+  if (!fs.existsSync(dir)) {
+    err(`Directory does not exist: ${dir}`);
+    process.exit(1);
+  }
+
+  bold(`\n🔧 claude-infra v${VERSION}\n`);
+  info(`Target: ${dir}`);
+
+  const hasExisting = fs.existsSync(path.join(dir, '.claude'));
+  if (hasExisting) {
+    warn('.claude/ already exists');
+    const current = getCurrentVersion(dir);
+    info(`Current version: ${current}`);
+    warn('Use "claude-infra upgrade" to upgrade, or "--force" to overwrite');
+    process.exit(1);
+  }
+
+  // Detect
+  const projType = detectProjectType(dir);
+  const projName = getProjectName(dir);
+  const branch = getMainBranch(dir);
+  const cfg = PROJECT_CONFIG[projType] || PROJECT_CONFIG.generic;
+
+  info(`Project type: ${projType}`);
+  info(`Project name: ${projName}`);
+  info(`Main branch: ${branch}`);
+
+  // Copy templates
+  const vars = {
+    PROJECT_NAME: projName,
+    PROJECT_TYPE: projType,
+    MAIN_BRANCH: branch,
+    FORMATTER_CMD: cfg.formatter,
+    FORMATTER_HOOK_NAME: cfg.formatter ? `${cfg.formatter}-post-edit` : '',
+    FILE_EXTENSION: cfg.ext,
+    LOG_NAME: cfg.formatter || 'hook',
+    DATE: new Date().toISOString().split('T')[0],
+  };
+
+  info('Installing templates...');
+  copyTemplate(TEMPLATE_DIR, path.join(dir, '.claude'), vars);
+
+  // Permissions
+  const hooksDir = path.join(dir, '.claude', 'hooks');
+  for (const f of fs.readdirSync(hooksDir)) {
+    if (f.endsWith('.sh')) {
+      fs.chmodSync(path.join(hooksDir, f), 0o755);
+    }
+  }
+  fs.chmodSync(path.join(dir, '.claude', 'hooks', '_lib', 'common.sh'), 0o755);
+  ok('Hooks made executable');
+
+  // Logs
+  fs.mkdirSync(path.join(dir, '.claude', 'logs'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.claude', 'logs', '.gitignore'), '*.log\n!.gitignore\n');
+
+  // Gitignore
+  const gitignore = path.join(dir, '.gitignore');
+  const patterns = ['.claude/logs/*.log', '.claude/settings.local.json', '.claude/memory/sessions/*.md'];
+  let giContent = fs.existsSync(gitignore) ? fs.readFileSync(gitignore, 'utf8') : '';
+  for (const p of patterns) {
+    if (!giContent.includes(p)) giContent += (giContent.endsWith('\n') ? '' : '\n') + p + '\n';
+  }
+  fs.writeFileSync(gitignore, giContent);
+  ok('Updated .gitignore');
+
+  // Manifest
+  const manifest = {
+    schema_version: '2.0.0',
+    installed_at: new Date().toISOString(),
+    installed_by: `claude-infra v${VERSION}`,
+    project_type: projType,
+    project_name: projName,
+  };
+  fs.writeFileSync(
+    path.join(dir, '.claude', '.claude-infra', 'manifest.json'),
+    JSON.stringify(manifest, null, 2)
+  );
+
+  // Audit
+  info('Running initial audit...');
+  try {
+    const audit = require('../lib/audit');
+    const result = audit.run(dir);
+    ok(`Audit: ${result.passed}/${result.total} checks passed`);
+  } catch {
+    warn('Audit tool not available (skip)');
+  }
+
+  // Summary
+  bold('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  bold('🎉 Installation Complete!');
+  bold('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  log(`\n  ${C.green}✅${C.reset} Project: ${projName}`);
+  log(`  ${C.green}✅${C.reset} Type: ${projType}`);
+  log(`  ${C.green}✅${C.reset} Version: 2.0.0`);
+  log(`\n  Next steps:`);
+  log(`    1. Edit .claude/CLAUDE.md for your project`);
+  log(`    2. Edit .claude/TASTE_INVARIANTS.md with your rules`);
+  log(`    3. Run: ${C.cyan}claude-infra doctor${C.reset}`);
+  log(`    4. Commit: ${C.cyan}git add .claude/ && git commit -m "Add Claude Code infra"${C.reset}`);
+  log('');
+}
+
+async function cmdAudit(targetDir) {
+  const dir = path.resolve(targetDir || process.cwd());
+  const audit = require('../lib/audit');
+  audit.run(dir);
+}
+
+async function cmdStatus(targetDir) {
+  const dir = path.resolve(targetDir || process.cwd());
+  const claudeDir = path.join(dir, '.claude');
+
+  bold(`\n📊 Claude Infrastructure Status\n`);
+  log(`  CLI Version:     ${C.cyan}v${VERSION}${C.reset}`);
+  log(`  Project:         ${dir}`);
+
+  if (!fs.existsSync(claudeDir)) {
+    log(`  Status:          ${C.red}Not installed${C.reset}`);
+    log(`\n  Run: ${C.cyan}claude-infra init${C.reset} to set up\n`);
+    return;
+  }
+
+  const ver = getCurrentVersion(dir);
+  log(`  Config Version:  ${C.cyan}${ver}${C.reset}`);
+
+  const files = fs.existsSync(claudeDir) ? fs.readdirSync(claudeDir, { recursive: true }).filter(f => fs.statSync(path.join(claudeDir, f)).isFile()).length : 0;
+  log(`  Files:           ${files}`);
+
+  const skills = fs.existsSync(path.join(claudeDir, 'skills'))
+    ? fs.readdirSync(path.join(claudeDir, 'skills')).filter(f => fs.statSync(path.join(claudeDir, 'skills', f)).isDirectory()).length
+    : 0;
+  log(`  Skills:          ${skills}`);
+
+  const hasV2 = fs.existsSync(path.join(claudeDir, 'bin', 'claude-audit.py'));
+  log(`  Infra Version:   ${hasV2 ? C.green + 'v2 (with audit + memory)' + C.reset : C.yellow + 'v1 (legacy)' + C.reset}`);
+  log('');
+}
+
+async function cmdUpgrade(targetDir) {
+  const dir = path.resolve(targetDir || process.cwd());
+  const current = getCurrentVersion(dir);
+
+  bold(`\n⬆️  Upgrade Claude Infrastructure\n`);
+  info(`Current: ${current}`);
+  info(`Target:  ${VERSION}`);
+
+  if (current === VERSION) {
+    ok('Already up to date!');
+    return;
+  }
+
+  // Backup
+  const backupDir = path.join(dir, `.claude-backup-${Date.now()}`);
+  fs.cpSync(path.join(dir, '.claude'), backupDir, { recursive: true });
+  ok(`Backup: ${path.basename(backupDir)}`);
+
+  // Upgrade: copy skeleton files that are safe to overwrite
+  const skeletonFiles = [
+    'bin/claude-audit.py',
+    'bin/claude-admin.py',
+    'hooks/_lib/common.sh',
+    'CODE_REVIEW_GUIDE.md',
+    'SKILLS_MANAGEMENT_GUIDE.md',
+    '.claude-infra/manifest.json',
+  ];
+
+  for (const rel of skeletonFiles) {
+    const src = path.join(TEMPLATE_DIR, rel);
+    const dst = path.join(dir, '.claude', rel);
+    if (fs.existsSync(src)) {
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      fs.copyFileSync(src, dst);
+    }
+  }
+
+  // Ensure memory structure
+  for (const sub of ['memory/decisions', 'memory/sessions']) {
+    fs.mkdirSync(path.join(dir, '.claude', sub), { recursive: true });
+  }
+
+  // Update version
+  fs.writeFileSync(path.join(dir, '.claude', '.claude-version'), VERSION + '\n');
+
+  ok(`Upgraded to v${VERSION}`);
+  info(`Backup: ${backupDir}`);
+  log('');
+}
+
+async function cmdRemove(targetDir) {
+  const dir = path.resolve(targetDir || process.cwd());
+  const claudeDir = path.join(dir, '.claude');
+
+  if (!fs.existsSync(claudeDir)) {
+    err('No .claude/ found');
+    return;
+  }
+
+  bold(`\n🗑️  Remove Claude Infrastructure\n`);
+  warn(`This will delete: ${claudeDir}`);
+
+  const backupDir = path.join(dir, `.claude-backup-uninstall-${Date.now()}`);
+  fs.cpSync(claudeDir, backupDir, { recursive: true });
+
+  fs.rmSync(claudeDir, { recursive: true, force: true });
+
+  ok('Removed .claude/');
+  info(`Backup: ${path.basename(backupDir)}`);
+  log('');
+}
+
+async function cmdDoctor(targetDir) {
+  const dir = path.resolve(targetDir || process.cwd());
+  const audit = require('../lib/audit');
+  audit.run(dir, { fix: true });
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────
+function showHelp() {
+  bold(`claude-infra v${VERSION}`);
+  log('');
+  log('Production-grade scaffolding and ops toolkit for Claude Code.');
+  log('');
+  bold('Commands:');
+  log('  init [DIR]        Initialize .claude/ in a project');
+  log('  audit [DIR]       Run configuration health check');
+  log('  upgrade [DIR]     Upgrade to latest version');
+  log('  status [DIR]      Show installation status');
+  log('  doctor [DIR]      Diagnose + auto-fix issues');
+  log('  remove [DIR]      Remove .claude/ configuration');
+  log('');
+  bold('Options:');
+  log('  -v, --version     Show version');
+  log('  -h, --help        Show help');
+  log('');
+  bold('Examples:');
+  log('  claude-infra init ~/projects/my-app');
+  log('  claude-infra status');
+  log('  claude-infra doctor');
+  log('  npx claude-infra init    # No install needed');
+  log('');
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const cmd = args[0];
+
+  if (!cmd || cmd === '-h' || cmd === '--help') {
+    showHelp();
+    return;
+  }
+
+  if (cmd === '-v' || cmd === '--version') {
+    log(VERSION);
+    return;
+  }
+
+  const target = args[1];
+
+  switch (cmd) {
+    case 'init':    cmdInit(target); break;
+    case 'audit':   cmdAudit(target); break;
+    case 'upgrade': cmdUpgrade(target); break;
+    case 'status':  cmdStatus(target); break;
+    case 'doctor':  cmdDoctor(target); break;
+    case 'remove':  cmdRemove(target); break;
+    default:
+      err(`Unknown command: ${cmd}`);
+      log('');
+      showHelp();
+      process.exit(1);
+  }
+}
+
+main();

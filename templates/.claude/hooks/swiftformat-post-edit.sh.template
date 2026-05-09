@@ -1,0 +1,29 @@
+#!/bin/bash
+# Post-Edit Formatter Hook - formats files immediately after edit
+# Replace {{FORMATTER_CMD}} with your formatter (e.g., swiftformat, prettier, black)
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/../logs"
+LOG_FILE="$LOG_DIR/{{LOG_NAME}}.log"
+mkdir -p "$LOG_DIR"
+
+EVENT_DATA=$(cat)
+TOOL_NAME=$(echo "$EVENT_DATA" | jq -r '.tool // "unknown"')
+FILE_PATH=""
+
+case "$TOOL_NAME" in
+    Edit|Write)
+        FILE_PATH=$(echo "$EVENT_DATA" | jq -r '.parameters.file_path // empty')
+        ;;
+    *) exit 0 ;;
+esac
+
+# Customize file extension for your language
+[[ ! "$FILE_PATH" =~ \.{{FILE_EXTENSION}}$ ]] && exit 0
+[ ! -f "$FILE_PATH" ] && exit 0
+command -v {{FORMATTER_CMD}} &>/dev/null || exit 0
+
+if {{FORMATTER_CMD}} "$FILE_PATH" --quiet 2>/dev/null; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Formatted: $FILE_PATH" >> "$LOG_FILE"
+fi
+exit 0

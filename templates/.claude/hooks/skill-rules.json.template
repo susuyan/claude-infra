@@ -1,0 +1,55 @@
+{
+  "skills": {
+    "code-review-developer": {
+      "type": "domain",
+      "priority": "high",
+      "description": "Smart router to code review guidelines. Review standards, actionable feedback only.",
+      "promptTriggers": {
+        "keywords": ["code review", "PR review", "review code", "pull request", "approve", "feedback"],
+        "intentPatterns": ["(review|check|analyze).*?(code|pr|pull request|changes|diff)"]
+      },
+      "fileTriggers": {
+        "pathPatterns": [],
+        "contentPatterns": []
+      }
+    },
+    "self-review": {
+      "type": "workflow",
+      "priority": "medium",
+      "description": "Agent self-reviews its own diff against TASTE_INVARIANTS.md before presenting to user.",
+      "promptTriggers": {
+        "keywords": ["self-review", "taste check", "verify changes", "quality check", "before submit"],
+        "intentPatterns": ["(check|verify|review).*?(my|own|these).*?(changes|code|diff)"]
+      },
+      "fileTriggers": {
+        "pathPatterns": ["**/TASTE_INVARIANTS.md"],
+        "contentPatterns": []
+      }
+    },
+    "confidence-check": {
+      "type": "workflow",
+      "priority": "high",
+      "description": "Pre-implementation confidence assessment to prevent wrong-direction work.",
+      "promptTriggers": {
+        "keywords": ["implement", "build feature", "create feature", "add feature", "complex task", "major refactor"],
+        "intentPatterns": ["(implement|build|create|add).*?(feature|functionality|component)"]
+      },
+      "fileTriggers": {
+        "pathPatterns": [],
+        "contentPatterns": []
+      }
+    }
+  },
+  "config": {
+    "maxSkillsPerPrompt": 2,
+    "logActivations": true,
+    "logPath": ".claude/logs/skill-activations.log",
+    "scoring": {
+      "keywordWeight": 2,
+      "intentWeight": 3,
+      "confidenceThreshold": 3,
+      "highConfidenceScore": 6,
+      "mediumConfidenceScore": 4
+    }
+  }
+}

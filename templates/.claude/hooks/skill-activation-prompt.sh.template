@@ -1,0 +1,88 @@
+#!/bin/bash
+
+# Skill Activation Prompt Hook (UserPromptSubmit)
+# Analyzes user prompt and suggests relevant skills based on skill-rules.json
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_RULES="$SCRIPT_DIR/skill-rules.json"
+LOG_DIR="$SCRIPT_DIR/../logs"
+LOG_FILE="$LOG_DIR/skill-activations.log"
+
+mkdir -p "$LOG_DIR"
+
+# Read event data
+EVENT_DATA=$(cat)
+PROMPT=$(echo "$EVENT_DATA" | jq -r '.prompt // empty' | tr '[:upper:]' '[:lower:]')
+
+# Exit if no prompt
+if [ -z "$PROMPT" ]; then
+    exit 0
+fi
+
+# Check if skill-rules.json exists
+if [ ! -f "$SKILL_RULES" ]; then
+    exit 0
+fi
+
+# Validate JSON
+if ! jq empty "$SKILL_RULES" 2>/dev/null; then
+    exit 0
+fi
+
+# Read config
+KEYWORD_WEIGHT=$(jq -r '.config.scoring.keywordWeight // 2' "$SKILL_RULES")
+INTENT_WEIGHT=$(jq -r '.config.scoring.intentWeight // 3' "$SKILL_RULES")
+CONFIDENCE_THRESHOLD=$(jq -r '.config.scoring.confidenceThreshold // 3' "$SKILL_RULES")
+HIGH_SCORE=$(jq -r '.config.scoring.highConfidenceScore // 6' "$SKILL_RULES")
+MEDIUM_SCORE=$(jq -r '.config.scoring.mediumConfidenceScore // 4' "$SKILL_RULES")
+MAX_SKILLS=$(jq -r '.config.maxSkillsPerPrompt // 2' "$SKILL_RULES")
+
+# Score skills
+SUGGESTIONS=$(jq -r --arg prompt "$PROMPT" --arg kw "$KEYWORD_WEIGHT" --arg iw "$INTENT_WEIGHT" --arg ct "$CONFIDENCE_THRESHOLD" '
+    .skills | to_entries | map({
+        name: .key,
+        description: .value.description,
+        score: (
+            ((.value.promptTriggers.keywords // []) | map(select($prompt | contains(.))) | length * ($kw | tonumber)) +
+            ((.value.promptTriggers.intentPatterns // []) | map(select($prompt | test(.; "i"))) | length * ($iw | tonumber))
+        )
+    }) | map(select(.score >= ($ct | tonumber))) | sort_by(-.score) | .[0:($maxSkills | tonumber // 2)]
+' "$SKILL_RULES" 2>/dev/null || echo "[]")
+
+# Log activation
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+echo "[$TIMESTAMP] Analyzing prompt: $PROMPT" >> "$LOG_FILE"
+
+# Check if any suggestions
+COUNT=$(echo "$SUGGESTIONS" | jq 'length')
+if [ "$COUNT" -eq 0 ]; then
+    echo "  No matches found" >> "$LOG_FILE"
+    exit 0
+fi
+
+# Output suggestions
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🎯 SKILL ACTIVATION CHECK"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+echo "$SUGGESTIONS" | jq -r --arg hs "$HIGH_SCORE" --arg ms "$MEDIUM_SCORE" '
+    .[] | 
+    if .score >= ($hs | tonumber) then "🟢 HIGH confidence"
+    elif .score >= ($ms | tonumber) then "🟡 MEDIUM confidence"
+    else "🟠 LOW confidence"
+    end as $badge |
+    "📚 Relevant Skill: \(.name)\n   Badge: \($badge)\n   Description: \(.description)\n"
+'
+
+echo "💡 Consider using these skills if they're relevant to this task."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Log matches
+echo "$SUGGESTIONS" | jq -r '.[] | "  ✓ Matched: \(.name) (score: \(.score))"' >> "$LOG_FILE"
+
+exit 0

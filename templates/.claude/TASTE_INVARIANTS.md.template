@@ -1,0 +1,115 @@
+# Taste Invariants
+
+Mechanical rules enforced on every code change. Each rule is grep-able and has a clear remediation.
+When the agent struggles with a rule, the fix is encoding it here — not "trying harder."
+
+*Inspired by: [Harness Engineering: Codex](https://openai.com/index/harness-engineering/) — "golden principles" pattern*
+
+## How to Use
+
+**Before submitting code**: Run the self-review skill (`/simplify` or manual check) against this file.
+**When reviewing PRs**: Check diff against these invariants.
+**When a new pattern violation recurs**: Add it here with grep pattern + remediation.
+
+---
+
+{{#LANGUAGE_INVARIANTS}}
+
+## {{language}} API Invariants
+
+{{#api_rules}}
+### {{title}}
+- **Grep**: `{{grep_pattern}}`
+- **Why**: {{reason}}
+- **Fix**: {{fix}}
+{{#exception}}
+- **Exception**: {{exception}}
+{{/exception}}
+
+{{/api_rules}}
+{{/LANGUAGE_INVARIANTS}}
+
+## Architecture Invariants
+
+{{#architecture_rules}}
+### {{title}}
+- **Grep**: {{grep_pattern}}
+- **Why**: {{reason}}
+- **Fix**: {{fix}}
+
+{{/architecture_rules}}
+
+## Localization Invariants
+
+{{#HAS_LOCALIZATION}}
+### No hardcoded user-facing strings
+- **Grep**: `{{localization_grep}}`
+- **Why**: Breaks localization
+- **Fix**: Add key to localization files, use generated constants
+- **Exception**: Debug-only strings, format strings in non-UI code
+{{/HAS_LOCALIZATION}}
+
+## Design System Invariants
+
+{{#HAS_DESIGN_SYSTEM}}
+### No hardcoded colors
+- **Grep**: `{{color_grep}}`
+- **Why**: Bypasses design system, breaks dark mode
+- **Fix**: Use design system color constants
+
+### No hardcoded font sizes
+- **Grep**: `{{font_grep}}`
+- **Why**: Bypasses typography system
+- **Fix**: Use design system typography
+{{/HAS_DESIGN_SYSTEM}}
+
+## Code Quality Invariants
+
+### No optional booleans for tri-state — use enums
+- **Grep**: `{{optional_bool_grep}}`
+- **Why**: `Bool?` (true/false/nil) creates ambiguous logic
+- **Fix**: Define an enum with explicit named cases
+- **Exception**: API parameters that simply pass through optionals
+
+### No force unwraps in production code
+- **Grep**: `{{force_unwrap_grep}}`
+- **Why**: Runtime crash risk
+- **Fix**: Use safe unwrapping with defaults
+- **Exception**: Truly guaranteed values (with comment explaining why)
+
+### No `print()` — use structured logging
+- **Grep**: `{{print_grep}}`
+- **Why**: Not captured in logging infrastructure
+- **Fix**: Use proper logging framework
+
+{{#HAS_CODEGEN}}
+### Generated files are never manually edited
+- **Grep**: Changes to files containing `{{codegen_marker}}`
+- **Why**: Overwritten on next generation
+- **Fix**: Edit source file, then run generation command
+{{/HAS_CODEGEN}}
+
+## Refactoring Invariants
+
+### All references updated when renaming
+- **Check**: `rg "oldName" {{file_pattern}}` returns 0 results (excluding generated files)
+- **Why**: Missed references cause build failures or dead code
+- **Fix**: Search and update all: production, tests, mocks, DI registrations
+
+### Unused code removed after refactoring
+- **Check**: No orphaned files, unreferenced properties, or dead imports
+- **Why**: Prevents bloat and confusion
+- **Fix**: Search for usages, delete if unreferenced
+
+---
+
+## Adding New Invariants
+
+When you encounter a recurring pattern violation:
+
+1. **Add it here** with: rule name, grep pattern, why, fix, exceptions
+2. **Make it mechanical** — if it can be grepped, it can be enforced
+3. **Include remediation** — the fix should be in the error message
+4. **Keep it focused** — one rule per entry, no essays
+
+The goal: every rule in this file should be verifiable without human judgment.
