@@ -1,0 +1,15 @@
+{
+  "_comment": "Plugin-level hooks for claude-infra. These are registered by Claude Code when the plugin is loaded.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '🏗️  claude-infra v2.0.0 loaded. Run /claude-infra:init to scaffold a project or /claude-infra:status to check existing config.'"
+          }
+        ]
+      }
+    ]
+  }
+}

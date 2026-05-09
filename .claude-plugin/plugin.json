@@ -1,0 +1,24 @@
+{
+  "name": "claude-infra",
+  "version": "2.0.0",
+  "description": "Production-grade scaffolding and ops toolkit for Claude Code infrastructure",
+  "author": {
+    "name": "Craft Agent",
+    "email": "agents-noreply@craft.do"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/susuyan/claude-infra.git"
+  },
+  "homepage": "https://github.com/susuyan/claude-infra#readme",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "scaffold",
+    "infrastructure",
+    "audit",
+    "hooks",
+    "skills",
+    "progressive-disclosure"
+  ]
+}

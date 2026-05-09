@@ -1,12 +1,13 @@
 {
   "name": "claude-infra",
   "version": "2.0.0",
-  "description": "Production-grade scaffolding and ops toolkit for Claude Code infrastructure — install, audit, upgrade, and manage your .claude/ configuration.",
+  "description": "Claude Code plugin for scaffolding and managing .claude/ infrastructure — progressive disclosure docs, automated hooks, skills, and safety guards.",
   "main": "lib/index.js",
   "bin": {
     "claude-infra": "bin/claude-infra"
   },
   "scripts": {
+    "postinstall": "node lib/postinstall.js",
     "test": "node --test lib/**/*.test.js",
     "lint": "eslint bin/ lib/",
     "format": "prettier --write bin/ lib/"
@@ -15,6 +16,8 @@
     "claude-code",
     "claude",
     "anthropic",
+    "plugin",
+    "claude-code-plugin",
     "ai",
     "scaffold",
     "infrastructure",
@@ -22,7 +25,8 @@
     "developer-tools",
     "code-review",
     "hooks",
-    "skills"
+    "skills",
+    "progressive-disclosure"
   ],
   "author": "Craft Agent <agents-noreply@craft.do>",
   "license": "MIT",
@@ -51,10 +55,16 @@
     "prettier": "^3.2.5"
   },
   "files": [
+    ".claude-plugin/",
+    "commands/",
+    "agents/",
+    "skills/",
+    "hooks/",
     "bin/",
     "lib/",
     "templates/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ]
 }

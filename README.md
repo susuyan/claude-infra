@@ -1,7 +1,6 @@
 # claude-infra
 
-> Production-grade scaffolding and ops toolkit for [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview).
-> Initialize, audit, upgrade, and manage your `.claude/` infrastructure with one command.
+> Claude Code Plugin — Production-grade scaffolding and ops toolkit for your `.claude/` infrastructure.
 
 [![npm version](https://img.shields.io/npm/v/claude-infra.svg)](https://www.npmjs.com/package/claude-infra)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -10,39 +9,43 @@
 
 ## ✨ What is claude-infra?
 
-`claude-infra` scaffolds a complete, production-ready **Claude Code infrastructure** for any project — in seconds.
+**claude-infra** is a [Claude Code Plugin](https://docs.anthropic.com/en/docs/claude-code/plugins) that scaffolds and manages production-ready Claude Code infrastructure for any project.
 
-Instead of manually creating `CLAUDE.md`, hooks, skills, and settings, run one command and get:
+Instead of manually creating `CLAUDE.md`, hooks, skills, and settings, run one command and get a complete, battle-tested setup:
 
 - 📄 **Progressive disclosure docs** — `CLAUDE.md` → Skills → Deep guides
-- 🪝 **6 automated hooks** — Skill activation, branch protection, git safety guards, auto-formatting
+- 🪝 **6 automated hooks** — Skill activation, branch protection, git safety, auto-formatting
 - 🧠 **3 core skills** — Code review, self-review, pre-implementation confidence check
-- 🔒 **Permission matrix + dual-layer safety** — `settings.json` deny list + hook regex guards
+- 🔒 **Permission matrix + dual-layer safety**
 - 🔍 **Built-in audit** — 11 automated health checks
 - 🧠 **Cross-session memory** — ADRs, convention logs, session summaries
 - 🔗 **CI integration** — GitHub Actions PR review template
-
-### 30-Second Demo
-
-```bash
-# Install (once)
-npm install -g claude-infra
-
-# Initialize in any project
-cd ~/projects/my-app
-claude-infra init
-
-# Done! Your .claude/ is ready.
-```
 
 ---
 
 ## 📦 Installation
 
-### Via npm (recommended)
+### As a Claude Code Plugin (recommended)
 
 ```bash
+# 1. Install the npm package
 npm install -g claude-infra
+
+# 2. Load the plugin in Claude Code
+claude --plugin-dir $(npm root -g)/claude-infra
+```
+
+Or add to your project's `.claude/settings.json`:
+
+```json
+{
+  "plugins": [
+    {
+      "name": "claude-infra",
+      "source": "/path/to/claude-infra"
+    }
+  ]
+}
 ```
 
 ### Via npx (no install)
@@ -51,16 +54,10 @@ npm install -g claude-infra
 npx claude-infra init
 ```
 
-### Via Homebrew (coming soon)
-
-```bash
-brew install claude-infra
-```
-
 ### Via curl
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/your-org/claude-infra/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/susuyan/claude-infra/main/install.sh | bash
 ```
 
 ---
@@ -69,8 +66,10 @@ curl -fsSL https://raw.githubusercontent.com/your-org/claude-infra/main/install.
 
 ### 1. Initialize
 
-```bash
-claude-infra init
+Inside Claude Code:
+
+```
+/claude-infra:init
 ```
 
 This will:
@@ -97,46 +96,35 @@ vim .claude/CODE_REVIEW_GUIDE.md
 
 ### 3. Verify
 
-```bash
-claude-infra doctor
+```
+/claude-infra:doctor
 ```
 
 Runs 11 health checks and auto-fixes issues.
 
 ---
 
-## 📋 Commands
+## 📋 Plugin Commands
 
 | Command | Description |
 |---------|-------------|
-| `claude-infra init [DIR]` | Initialize `.claude/` in a project |
-| `claude-infra audit [DIR]` | Run configuration health check |
-| `claude-infra doctor [DIR]` | Diagnose + auto-fix issues |
-| `claude-infra upgrade [DIR]` | Upgrade to latest version |
-| `claude-infra status [DIR]` | Show installation status |
-| `claude-infra remove [DIR]` | Remove `.claude/` (with backup) |
-| `claude-infra --version` | Show version |
+| `/claude-infra:init` | Initialize `.claude/` in current project |
+| `/claude-infra:audit` | Run configuration health check |
+| `/claude-infra:doctor` | Diagnose + auto-fix issues |
+| `/claude-infra:upgrade` | Upgrade to latest version |
+| `/claude-infra:status` | Show installation status |
 
-### Examples
+### CLI Equivalents
+
+All plugin commands are also available via CLI:
 
 ```bash
-# Initialize in current directory
-claude-infra init
-
-# Initialize in specific project
-claude-infra init ~/projects/my-ios-app
-
-# Check health
-claude-infra doctor
-
-# See what's installed
-claude-infra status
-
-# Upgrade existing config
-claude-infra upgrade
-
-# Remove (creates backup first)
-claude-infra remove
+claude-infra init [DIR]
+claude-infra audit [DIR]
+claude-infra doctor [DIR]
+claude-infra upgrade [DIR]
+claude-infra status [DIR]
+claude-infra remove [DIR]
 ```
 
 ---
@@ -242,12 +230,8 @@ All [TASTE_INVARIANTS.md](templates/.claude/TASTE_INVARIANTS.md) rules are:
 
 ## 🔄 Upgrade
 
-```bash
-# Check for and apply upgrade
-claude-infra upgrade
-
-# Auto-confirm
-claude-infra upgrade --yes
+```
+/claude-infra:upgrade
 ```
 
 Upgrades are **incremental** — your customizations (CLAUDE.md, skills, memory/) are preserved.
@@ -258,19 +242,19 @@ Upgrades are **incremental** — your customizations (CLAUDE.md, skills, memory/
 
 | Frequency | Task | Command |
 |-----------|------|---------|
-| **Weekly** | Health check | `claude-infra doctor` |
+| **Weekly** | Health check | `/claude-infra:doctor` |
 | **Weekly** | Check activation logs | `tail .claude/logs/skill-activations.log` |
 | **Monthly** | Update conventions | Edit `.claude/memory/conventions.md` |
 | **Monthly** | Review ADRs | Check `.claude/memory/decisions/` |
-| **Quarterly** | Check for upgrades | `claude-infra upgrade` |
+| **Quarterly** | Check for upgrades | `/claude-infra:upgrade` |
 
 ---
 
-## 🛠️ Development
+## 🛠️ Plugin Development
 
 ```bash
 # Clone
-git clone https://github.com/your-org/claude-infra.git
+git clone https://github.com/susuyan/claude-infra.git
 cd claude-infra
 
 # Link for local testing
@@ -278,17 +262,17 @@ npm link
 
 # Test in a project
 cd ~/projects/my-app
-claude-infra init
+claude --plugin-dir $(npm root -g)/claude-infra
 
-# Unlink when done
-npm unlink -g claude-infra
+# Inside Claude Code
+/claude-infra:init
 ```
 
 ---
 
 ## 📚 Philosophy
 
-This project is built on three principles learned from the [Anytype iOS](https://github.com/anyproto/anytype-swift) team's Claude Code infrastructure:
+Built on three principles learned from the [Anytype iOS](https://github.com/anyproto/anytype-swift) team's Claude Code infrastructure:
 
 1. **Progressive Disclosure** — Load only what's needed, when it's needed
 2. **Mechanical Rules > Willpower** — Every rule should be `grep`-able with a clear fix
