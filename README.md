@@ -25,39 +25,37 @@ Instead of manually creating `CLAUDE.md`, hooks, skills, and settings, run one c
 
 ## 📦 Installation
 
-### As a Claude Code Plugin (recommended)
+### Via Claude Code Plugin Marketplace (recommended)
 
-```bash
-# 1. Install the npm package
-npm install -g claude-infra
+Inside Claude Code:
 
-# 2. Load the plugin in Claude Code
-claude --plugin-dir $(npm root -g)/claude-infra
+```
+/plugin marketplace add susuyan/claude-infra
+/plugin install claude-infra@claude-infra
 ```
 
-Or add to your project's `.claude/settings.json`:
+Then use plugin commands directly:
+```
+/claude-infra:init     — Scaffold .claude/ in current project
+/claude-infra:audit    — Health check
+/claude-infra:doctor   — Diagnose + auto-fix
+```
 
-```json
-{
-  "plugins": [
-    {
-      "name": "claude-infra",
-      "source": "/path/to/claude-infra"
-    }
-  ]
-}
+### Via npm
+
+```bash
+npm install -g claude-infra
+```
+
+Then load in Claude Code:
+```bash
+claude --plugin-dir $(npm root -g)/claude-infra
 ```
 
 ### Via npx (no install)
 
 ```bash
 npx claude-infra init
-```
-
-### Via curl
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/susuyan/claude-infra/main/install.sh | bash
 ```
 
 ---
