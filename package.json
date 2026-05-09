@@ -28,12 +28,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/claude-infra.git"
+    "url": "https://github.com/susuyan/claude-infra.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/claude-infra/issues"
+    "url": "https://github.com/susuyan/claude-infra/issues"
   },
-  "homepage": "https://github.com/your-org/claude-infra#readme",
+  "homepage": "https://github.com/susuyan/claude-infra#readme",
   "engines": {
     "node": ">=18.0.0"
   },
